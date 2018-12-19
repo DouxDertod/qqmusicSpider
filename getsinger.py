@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import urllib2
+
+import os
+
+import re
 from bs4 import BeautifulSoup
 import urllib
 import mechanize
@@ -11,12 +15,21 @@ import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
 getnmID="getUCGI4637003703166609"
-page_number = 1
+page_number = 5
 city_name = 'aomen'
-max_number = 16
-index_number=1
-sys.stdout = open('singerA2.txt', 'w')
-for page in range(8,max_number+1):
+max_number = 15
+index_number=2
+
+
+temp=sys.stdout
+
+def validateTitle(title):
+    rstr = r"[\/\\\:\*\?\"\<\>\|]"  # '/ \ : * ? " < > |'
+    new_title = re.sub(rstr, " ", title)  # 替换为下划线
+    return new_title
+
+for page in range(page_number,max_number+1):
+
     #sys.stdout = open(city_name+str(page)+'.txt', 'w')
     br = mechanize.Browser()
     br.set_handle_robots(False)
@@ -30,6 +43,7 @@ for page in range(8,max_number+1):
     query_base = "https://y.qq.com/portal/singer_list.html"
     wrong_website_list = []
     current_website = ''
+    singer_name=''
     try:
 
         htmltext = br.open(query).read()
@@ -39,18 +53,45 @@ for page in range(8,max_number+1):
         singer_list_jsonData=json.loads(json_text)
         singer_list=singer_list_jsonData.get("singerList").get("data").get("singerlist")
 
+        folder = "f:\\pachong\\" + 'S'+str(index_number)
+        # 获取此py文件路径，在此路径选创建在new_folder文件夹中的test文件夹
 
+        if not os.path.exists(folder):
+            os.makedirs(folder)
         for singer_data in singer_list:
-            print singer_data.get("singer_name")
+            singer_name=singer_data.get("singer_name")
+            singer_name=validateTitle(singer_name)
+            sys.stdout = open(folder+"\\"+singer_name+".txt", 'w')
             singermid=singer_data.get("singer_mid")
             query_album='https://u.y.qq.com/cgi-bin/musicu.fcg?callback='+getnmID+'&g_tk=5381&jsonpCallback=getUCGI06449673347468199&loginUin=0&hostUin=0&format=jsonp&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq&needNewCode=0&data={"singerAlbum":{"method":"get_singer_album","param":{"singermid":"'+singermid+'","order":"time","begin":0,"num":10000,"exstatus":1},"module":"music.web_singer_info_svr"}}'
             album_text = br.open(query_album).read()
             album_json_text = album_text.strip(getnmID + "(").strip(")")
             album_list_jsonData = json.loads(album_json_text)
-            if album_list_jsonData is None:
-                print("\t这个人贼可怜一张专辑都没有")
+
+            if album_list_jsonData is None \
+                    or not album_list_jsonData.has_key('singerAlbum')\
+                    or not album_list_jsonData.get("singerAlbum").has_key('data')\
+                    or not  album_list_jsonData.get("singerAlbum").get("data").has_key('list'):
+                album_text = br.open(query_album).read()
+                album_json_text = album_text.strip(getnmID + "(").strip(")")
+                album_list_jsonData = json.loads(album_json_text)
+                sys.stdout = temp
+                print("1-》"+singer_name)
+                print(album_list_jsonData)
+                sys.stdout = open(folder + "\\" + singer_name + ".txt", 'w')
+
+            if album_list_jsonData is None \
+                    or not album_list_jsonData.has_key('singerAlbum') \
+                    or not album_list_jsonData.get("singerAlbum").has_key('data') \
+                    or not album_list_jsonData.get("singerAlbum").get("data").has_key('list'):
+                sys.stdout = temp
+                print("2-》" + singer_name)
+                print(album_list_jsonData)
+                sys.stdout = open(folder + "\\" + singer_name + ".txt", 'w')
                 continue
+
             album_list = album_list_jsonData.get("singerAlbum").get("data").get("list")
+
             if album_list is None or len(album_list)==0:
                 print("\t这个人贼可怜一张专辑都没有")
                 continue
@@ -92,6 +133,10 @@ for page in range(8,max_number+1):
         #                 print(station_text).encode('utf-8')
         #         print('-----返程-----')
     except Exception, e:
+        sys.stdout = temp
+
+        print(singer_name)
+        print(album_json_text)
         print(repr(e))
         wrong_website_list.append(current_website)
         traceback.print_exc()
